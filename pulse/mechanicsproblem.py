@@ -6,22 +6,18 @@ import dolfin
 import ufl
 
 try:
-    from dolfin_adjoint import (
+    from dolfin_adjoint import (  # NonlinearVariationalProblem,; NonlinearVariationalSolver,
         Constant,
         Function,
         FunctionAssigner,
-        NonlinearVariationalProblem,
-        NonlinearVariationalSolver,
     )
 
     has_dolfin_adjoint = True
 except ImportError:
-    from dolfin import (
+    from dolfin import (  # NonlinearVariationalProblem,; NonlinearVariationalSolver,
         Constant,
         Function,
         FunctionAssigner,
-        NonlinearVariationalProblem,
-        NonlinearVariationalSolver,
     )
 
     has_dolfin_adjoint = False
@@ -192,6 +188,10 @@ class MechanicsProblem(object):
         if solver_parameters is not None:
             self.solver_parameters.update(**solver_parameters)
 
+        self._solver = None
+        self.output_matrix = False
+        self.output_matrix_path = "."
+
     @staticmethod
     def default_bcs_parameters():
         return dict(pericardium_spring=0.0, base_spring=0.0, base_bc="fixed")
@@ -316,9 +316,9 @@ class MechanicsProblem(object):
 
         """
 
-        self._jacobian = dolfin.derivative(
-            self._virtual_work, self.state, dolfin.TrialFunction(self.state_space)
-        )
+        # self._jacobian = dolfin.derivative(
+        #     self._virtual_work, self.state, dolfin.TrialFunction(self.state_space)
+        # )
 
         logger.debug("Solving variational problem")
         # Get old state in case of non-convergence
@@ -332,16 +332,35 @@ class MechanicsProblem(object):
 
         else:
             old_state = self.state.copy(deepcopy=True)
-        problem = NonlinearVariationalProblem(
-            self._virtual_work, self.state, self._dirichlet_bc, self._jacobian
-        )
 
-        solver = NonlinearVariationalSolver(problem)
-        solver.parameters.update(self.solver_parameters)
+        if self._solver is None:
+            import os
+
+            import dolfin as df
+
+            from .solver import NewtonSolver, NonlinearProblem
+
+            J = df.fem.formmanipulations.derivative(self._virtual_work, self.state)
+            if self.output_matrix:
+                os.makedirs(self.output_matrix_path, exist_ok=True)
+            self.problem = NonlinearProblem(
+                J, self._virtual_work, (self._dirichlet_bc,)
+            )
+            self._solver = NewtonSolver(
+                self.geometry.mesh,
+            )
+
+        # problem = NonlinearVariationalProblem(
+        #     self._virtual_work, self.state, self._dirichlet_bc, self._jacobian
+        # )
+
+        # solver = NonlinearVariationalSolver(problem)
+        # solver.parameters.update(self.solver_parameters)
 
         try:
             logger.debug("Try to solve")
-            nliter, nlconv = solver.solve()
+            nliter, nlconv = self._solver.solve(self.problem, self.state.vector())
+            # nliter, nlconv = solver.solve()
             if not nlconv:
                 logger.debug("Failed")
                 raise SolverDidNotConverge("Solver did not converge...")
