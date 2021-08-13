@@ -1,0 +1,11 @@
+name: pulse
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+    - python
+    - h5py
+    - fenics
+    - scipy
+    - matplotlib
+    - pulse
