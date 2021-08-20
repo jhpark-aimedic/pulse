@@ -44,7 +44,7 @@ def test_demo(filename, root):
 
     sp.check_call(["jupytext", filename, "--to", ".py"])
     py_filename = Path(filename).with_suffix(".py")
-    print(py_filename)
+    # print(py_filename)
     sys.path.append(root)
     # Execute file
     with mock.patch("pulse.mechanicsproblem.MechanicsProblem.solve") as solve_mock:
